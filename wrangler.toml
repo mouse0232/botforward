@@ -2,11 +2,5 @@ name = "tg-bot-content-forwarder"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
-[vars]
-TELEGRAM_CHANNEL_ID = "@your_channel_username"
-WORKERS_AI_MODEL = "@cf/meta/llama-3-8b-instruct"
-SUMMARY_MAX_LENGTH = "200"
-REQUEST_TIMEOUT = "30000"
-
 [ai]
 binding = "AI"
