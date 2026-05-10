@@ -8,5 +8,5 @@ WORKERS_AI_MODEL = "@cf/meta/llama-3-8b-instruct"
 SUMMARY_MAX_LENGTH = "200"
 REQUEST_TIMEOUT = "30000"
 
-[[ai]]
+[ai]
 binding = "AI"
