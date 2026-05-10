@@ -103,16 +103,17 @@ ${content.substring(0, 4000)}
       return '无文本内容';
     }
 
-    const prompt = `请阅读以下 Telegram 消息内容，并生成一个不超过${maxLength}字的简体中文摘要：
+    const truncatedContent = content.length > 3000 ? content.substring(0, 3000) + '...' : content;
 
-消息内容：
-${content}
+    const prompt = `请总结以下 Telegram 消息内容，生成不超过${maxLength}字的简体中文摘要：
+
+内容：
+${truncatedContent}
 
 要求：
-1. 用简体中文
+1. 简体中文
 2. 不超过${maxLength}字
-3. 概括主要内容
-4. 不要添加个人评论
+3. 概括核心要点
 
 摘要：`;
 

@@ -18,6 +18,7 @@ const app = new Hono<{ Bindings: Env }>();
 app.post('/webhook', async (c) => {
   try {
     const body = await c.req.json();
+    console.log('Received update:', JSON.stringify(body, null, 2));
     
     if (!body.message) {
       console.log('No message in update, skipping');

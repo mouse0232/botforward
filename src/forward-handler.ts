@@ -55,34 +55,34 @@ export class ForwardHandler {
         return;
       }
 
-      const summary = await this.aiProcessor.summarizeMessage(content, this.maxLength);
-      
+      let summary = '';
+      try {
+        summary = await this.aiProcessor.summarizeMessage(content, this.maxLength);
+      } catch (aiError) {
+        console.error('AI Summarization failed:', aiError);
+        summary = '';
+      }
+
       const link = classification.forwardedFromChatId && classification.forwardedFromMessageId
         ? buildTelegramLink(classification.forwardedFromChatId, classification.forwardedFromMessageId)
         : '';
+
+      let finalMessage = '';
       
-      const caption = `📝 ${summary}\n\n📎 原消息链接：${link}`;
-      
-      if (classification.forwardedFromChatId && classification.forwardedFromMessageId) {
-        await this.telegramClient.copyMessage(
-          this.channelId,
-          String(classification.forwardedFromChatId),
-          classification.forwardedFromMessageId,
-          caption
-        );
+      if (summary) {
+        finalMessage = `📝 ${summary}\n\n📎 原消息链接：${link}`;
       } else {
-        await this.telegramClient.sendMessage(this.channelId, caption);
+        const shortContent = content.length > 400 ? content.substring(0, 400) + '...' : content;
+        finalMessage = `🔄 转发消息\n\n📄 ${shortContent}\n\n📎 原消息链接：${link}`;
       }
+      
+      await this.telegramClient.sendMessage(this.channelId, finalMessage);
+      
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Failed to summarize forwarded message:', errorMessage);
+      console.error('Failed to handle forwarded message:', errorMessage);
       
-      const link = classification.forwardedFromChatId && classification.forwardedFromMessageId
-        ? buildTelegramLink(classification.forwardedFromChatId, classification.forwardedFromMessageId)
-        : '';
-      
-      const fallbackMessage = `⚠️ 无法生成摘要\n\n📎 原消息链接：${link}`;
-      await this.telegramClient.sendMessage(this.channelId, fallbackMessage);
+      await this.telegramClient.sendMessage(this.channelId, `⚠️ 转发失败: ${errorMessage}`);
     }
   }
 
