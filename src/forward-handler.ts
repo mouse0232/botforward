@@ -64,7 +64,7 @@ export class ForwardHandler {
       }
 
       const link = classification.forwardedFromChatId && classification.forwardedFromMessageId
-        ? buildTelegramLink(classification.forwardedFromChatId, classification.forwardedFromMessageId)
+        ? buildTelegramLink(classification.forwardedFromChatId, classification.forwardedFromMessageId, classification.forwardedFromChatUsername)
         : '';
 
       let finalMessage = '';

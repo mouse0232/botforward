@@ -71,7 +71,7 @@ export interface MessageClassification {
   text?: string;
   forwardedFromChatId?: number;
   forwardedFromMessageId?: number;
-  forwardedFromChatTitle?: string;
+  forwardedFromChatUsername?: string;
 }
 
 export function classifyMessage(message: TelegramMessage): MessageClassification {
@@ -81,7 +81,7 @@ export function classifyMessage(message: TelegramMessage): MessageClassification
       text: message.text || message.caption || '',
       forwardedFromChatId: message.forward_from_chat?.id || message.forward_from?.id,
       forwardedFromMessageId: message.forward_from_message_id,
-      forwardedFromChatTitle: message.forward_from_chat?.title || message.forward_from?.username
+      forwardedFromChatUsername: message.forward_from_chat?.username
     };
   }
   
@@ -107,7 +107,11 @@ export function isValidUrl(text: string): boolean {
   return urlPattern.test(text);
 }
 
-export function buildTelegramLink(chatId: number, messageId: number): string {
+export function buildTelegramLink(chatId: number, messageId: number, username?: string): string {
+  if (username) {
+    return `https://t.me/${username}/${messageId}`;
+  }
+  
   if (chatId > 0) {
     return `https://t.me/+${chatId}/${messageId}`;
   } else {
