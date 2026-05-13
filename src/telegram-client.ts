@@ -22,9 +22,11 @@ export class TelegramClientImpl implements TelegramClient {
 
   async sendMessage(chatId: string, text: string, parseMode: string = 'HTML'): Promise<void> {
     const url = `${this.baseUrl}/sendMessage`;
-    
+
     const normalizedChatId = this.normalizeChatId(chatId);
-    
+
+    const safeText = parseMode === 'HTML' ? this.escapeHtml(text) : text;
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -32,7 +34,7 @@ export class TelegramClientImpl implements TelegramClient {
       },
       body: JSON.stringify({
         chat_id: normalizedChatId,
-        text: text,
+        text: safeText,
         parse_mode: parseMode
       })
     });
@@ -42,6 +44,13 @@ export class TelegramClientImpl implements TelegramClient {
     if (!result.ok) {
       throw new Error(`Telegram API error: ${result.description || 'Unknown error'}`);
     }
+  }
+
+  private escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
   }
 
   private normalizeChatId(chatId: string): string {
@@ -98,7 +107,7 @@ export class TelegramClientImpl implements TelegramClient {
     };
 
     if (caption) {
-      body.caption = caption;
+      body.caption = this.escapeHtml(caption);
       body.parse_mode = 'HTML';
     }
     
