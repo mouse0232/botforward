@@ -127,7 +127,7 @@ ${truncatedContent}
     try {
       const response = await this.ai.run(this.model, {
         messages: [
-          { role: 'system', content: '你是一个专业的内容摘要助手，擅长生成简洁准确的中文摘要。' },
+          { role: 'system', content: '你是一个专业的内容摘要助手。无论输入内容是什么语言，你必须始终输出简体中文摘要，不要输出其他语言。' },
           { role: 'user', content: prompt }
         ],
         max_tokens: 500
