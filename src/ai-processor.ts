@@ -88,7 +88,7 @@ export class WorkersAIProcessor implements AIProcessor {
 ${content.substring(0, 4000)}
 
 要求：
-1. 用简体中文
+1. 必须是简体中文，禁止出现任何英文语句
 2. 不超过${maxLength}字
 3. 概括主要内容
 4. 不要添加个人评论
@@ -111,7 +111,7 @@ ${content.substring(0, 4000)}
 ${truncatedContent}
 
 要求：
-1. 简体中文
+1. 必须是简体中文，禁止出现任何英文语句
 2. 不超过${maxLength}字
 3. 概括核心要点
 
