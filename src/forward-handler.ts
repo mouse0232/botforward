@@ -42,6 +42,11 @@ export class ForwardHandler {
     message: TelegramMessage,
     classification: MessageClassification
   ): Promise<void> {
+    if (message.media_group_id && !classification.text) {
+      console.log('Skipping media group item without text');
+      return;
+    }
+    
     try {
       const content = classification.text || '';
       
