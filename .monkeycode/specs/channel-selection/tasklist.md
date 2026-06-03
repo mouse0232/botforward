@@ -19,19 +19,24 @@
 创建 `src/channel-config.ts` 文件，实现频道配置的加载和管理功能。
 
 **具体步骤**:
-1. 定义 `ChannelConfig` 和 `ChannelConfigList` 接口
+1. 定义 `ChannelConfig` 接口
 2. 实现 `ChannelConfigManager` 类
-3. 实现从环境变量 `TELEGRAM_CHANNELS` 加载配置的逻辑
-4. 实现频道查询方法（按 ID、别名）
-5. 实现默认频道获取方法
-6. 添加配置验证逻辑
+3. 实现从环境变量 `TELEGRAM_CHANNELS` 解析配置的逻辑
+4. 解析规则：
+   - 按逗号分隔
+   - 包含冒号：前面是别名，后面是目标
+   - 不包含冒号：目标本身当作别名
+   - 第一个频道标记为默认频道
+5. 实现频道查询方法（按别名）
+6. 实现默认频道获取方法
+7. 添加配置验证逻辑
 
 **验收标准**:
-- [ ] 能够正确解析 JSON 格式的频道配置
-- [ ] `getAllChannels()` 返回所有启用的频道
-- [ ] `getChannelById()` 能正确查找频道
+- [ ] 能够正确解析逗号分隔的频道配置
+- [ ] `getAllChannels()` 返回所有频道
 - [ ] `getChannelByAlias()` 能通过别名查找频道
-- [ ] `getDefaultChannel()` 能返回默认频道
+- [ ] `getDefaultChannel()` 能返回第一个频道作为默认
+- [ ] 支持 @username 和数字 ID 格式
 - [ ] 配置错误时有明确的错误提示
 
 **依赖**: 无

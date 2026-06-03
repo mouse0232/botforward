@@ -68,17 +68,13 @@
 
 ```typescript
 export interface ChannelConfig {
-  id: string;              // 频道 ID
-  name: string;            // 频道名称（用于显示）
-  alias: string;           // 频道别名（用于命令）
-  isDefault: boolean;      // 是否为默认频道
-  enabled: boolean;        // 是否启用
+  id: string;           // @username 或频道 ID
+  alias: string;        // 别名（用于命令）
+  isDefault: boolean;   // 是否为默认频道（第一个就是默认）
 }
 
-export interface ChannelConfigList {
-  default: string;         // 默认频道 ID
-  channels: ChannelConfig[];
-}
+// 配置加载时从环境变量解析得到
+// 示例：从 "@mainchannel,tech:@techchannel" 解析出两个 ChannelConfig
 ```
 
 ### 3.2 频道选择状态
@@ -113,15 +109,14 @@ export interface BufferedMessage {
 
 ```typescript
 export class ChannelConfigManager {
-  constructor(config: ChannelConfigList);
+  constructor(configEnv: string);
 
   getAllChannels(): ChannelConfig[];
-  getChannelById(id: string): ChannelConfig | null;
   getChannelByAlias(alias: string): ChannelConfig | null;
   getDefaultChannel(): ChannelConfig | null;
-  getEnabledChannels(): ChannelConfig[];
 
-  validateChannelId(id: string): Promise<boolean>;
+  // 从环境变量字符串解析配置
+  private parseConfig(configEnv: string): ChannelConfig[];
 }
 ```
 
@@ -254,33 +249,17 @@ export class CommandHandler {
 ### 6.1 环境变量配置
 
 ```bash
-# 转发频道配置（JSON 格式）
-TELEGRAM_CHANNELS='{
-  "default": "-1001234567890",
-  "channels": [
-    {
-      "id": "-1001234567890",
-      "name": "主频道",
-      "alias": "main",
-      "isDefault": true,
-      "enabled": true
-    },
-    {
-      "id": "-1000987654321",
-      "name": "技术频道",
-      "alias": "tech",
-      "isDefault": false,
-      "enabled": true
-    },
-    {
-      "id": "-1001122334455",
-      "name": "新闻频道",
-      "alias": "news",
-      "isDefault": false,
-      "enabled": true
-    }
-  ]
-}'
+# 简单配置（使用 @username 或频道 ID）
+TELEGRAM_CHANNELS="@mainchannel,@techchannel,@newschannel"
+
+# 带别名配置
+TELEGRAM_CHANNELS="main:@mainchannel,tech:@techchannel,news:-1001122334455"
+
+# 混合使用
+TELEGRAM_CHANNELS="@mainchannel,tech:-1000987654321"
+
+# 第一个频道为默认频道
+TELEGRAM_CHANNEL_ID="@mainchannel"  # 可选，向后兼容
 
 # 频道选择超时时间（秒）
 CHANNEL_SELECTION_TIMEOUT=300
@@ -289,19 +268,19 @@ CHANNEL_SELECTION_TIMEOUT=300
 BUFFERED_MESSAGE_TTL=3600
 ```
 
-### 6.2 配置文件方案（备选）
+**配置格式说明：**
 
-如果环境变量长度受限，可以使用 D1 Database 存储配置：
+| 格式 | 示例 | 说明 |
+|------|------|------|
+| 简单列表 | `@a,@b,@c` | 用 @username 或频道 ID，第一个为默认 |
+| 带别名 | `main:@a,tech:@b` | `别名:目标`，可通过别名选择 |
+| 混合 | `@a,tech:@b` | 两种格式可以混合使用 |
 
-```sql
-CREATE TABLE channels (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  alias TEXT UNIQUE NOT NULL,
-  isDefault BOOLEAN DEFAULT FALSE,
-  enabled BOOLEAN DEFAULT TRUE
-);
-```
+**解析规则：**
+- 包含 `:` - 前面是别名，后面是目标
+- 不包含 `:` - 目标本身当作别名
+- 支持 `@username` 格式
+- 支持数字 ID 格式（如 `-1001234567890`）
 
 ---
 
