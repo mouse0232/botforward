@@ -1,7 +1,27 @@
 import { TelegramMessage } from './types';
 
+export interface InlineKeyboardButton {
+  text: string;
+  callback_data?: string;
+}
+
+export interface InlineKeyboardMarkup {
+  inline_keyboard: InlineKeyboardButton[][];
+}
+
 export interface TelegramClient {
   sendMessage(chatId: string, text: string, parseMode?: string): Promise<void>;
+  sendMessageWithButtons(
+    chatId: string,
+    text: string,
+    replyMarkup: InlineKeyboardMarkup,
+    parseMode?: string
+  ): Promise<void>;
+  editMessageReplyMarkup(
+    chatId: string,
+    messageId: number,
+    replyMarkup: InlineKeyboardMarkup | null
+  ): Promise<void>;
   forwardMessage(chatId: string, fromChatId: string, messageId: number): Promise<void>;
   copyMessage(
     chatId: string,
@@ -37,6 +57,71 @@ export class TelegramClientImpl implements TelegramClient {
         text: safeText,
         parse_mode: parseMode
       })
+    });
+
+    const result = await response.json();
+
+    if (!result.ok) {
+      throw new Error(`Telegram API error: ${result.description || 'Unknown error'}`);
+    }
+  }
+
+  async sendMessageWithButtons(
+    chatId: string,
+    text: string,
+    replyMarkup: InlineKeyboardMarkup,
+    parseMode: string = 'HTML'
+  ): Promise<void> {
+    const url = `${this.baseUrl}/sendMessage`;
+
+    const normalizedChatId = this.normalizeChatId(chatId);
+
+    const safeText = parseMode === 'HTML' ? this.escapeHtml(text) : text;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        chat_id: normalizedChatId,
+        text: safeText,
+        parse_mode: parseMode,
+        reply_markup: replyMarkup
+      })
+    });
+
+    const result = await response.json();
+
+    if (!result.ok) {
+      throw new Error(`Telegram API error: ${result.description || 'Unknown error'}`);
+    }
+  }
+
+  async editMessageReplyMarkup(
+    chatId: string,
+    messageId: number,
+    replyMarkup: InlineKeyboardMarkup | null
+  ): Promise<void> {
+    const url = `${this.baseUrl}/editMessageReplyMarkup`;
+
+    const normalizedChatId = this.normalizeChatId(chatId);
+
+    const body: any = {
+      chat_id: normalizedChatId,
+      message_id: messageId
+    };
+
+    if (replyMarkup) {
+      body.reply_markup = replyMarkup;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
     });
 
     const result = await response.json();
