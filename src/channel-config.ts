@@ -18,6 +18,8 @@ export class ChannelConfigManager {
 
     const channels: ChannelConfig[] = [];
     const parts = configEnv.split(',').map(p => p.trim()).filter(p => p.length > 0);
+    const seenAliases = new Set<string>();
+    const seenIds = new Set<string>();
 
     parts.forEach((part, index) => {
       const colonIndex = part.indexOf(':');
@@ -31,6 +33,29 @@ export class ChannelConfigManager {
         id = part;
         alias = part;
       }
+
+      if (!alias || alias === '') {
+        console.warn(`Skipping empty alias in channel configuration at index ${index}`);
+        return;
+      }
+
+      if (!id || id === '') {
+        console.warn(`Skipping empty ID in channel configuration at index ${index}`);
+        return;
+      }
+
+      if (seenAliases.has(alias)) {
+        console.warn(`Skipping duplicate alias "${alias}" in channel configuration`);
+        return;
+      }
+
+      if (seenIds.has(id)) {
+        console.warn(`Skipping duplicate ID "${id}" in channel configuration`);
+        return;
+      }
+
+      seenAliases.add(alias);
+      seenIds.add(id);
 
       channels.push({
         id,

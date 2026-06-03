@@ -8,6 +8,7 @@ export interface TelegramMessage {
   forward_from?: User;
   forward_from_chat?: Chat;
   forward_from_message_id?: number;
+  reply_to_message?: TelegramMessage;
   photo?: PhotoSize[];
   video?: Video;
   document?: Document;

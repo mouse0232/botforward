@@ -22,13 +22,9 @@ export class MessageRouter {
   ) {}
 
   async handleMessage(message: TelegramMessage): Promise<void> {
-    if (!message.text) {
-      return;
-    }
+    const text = message.text;
 
-    const text = message.text.trim();
-
-    if (text.startsWith('/')) {
+    if (text && text.trim().startsWith('/')) {
       await this.handleCommand(message);
     } else {
       await this.handleRegularMessage(message);
@@ -50,17 +46,20 @@ export class MessageRouter {
 
     try {
       if (callbackData.messageId) {
-        const chatId = callbackQuery.message?.chat.id || callbackQuery.from.id;
+        const userId = callbackQuery.from.id;
+        const cacheKey = `${userId}:${callbackData.messageId}`;
+        const message = this.channelSelector.getCachedMessage(cacheKey);
 
-        await this.forwardMessageById(
-          callbackData.messageId,
-          String(chatId),
-          channel
-        );
+        if (!message) {
+          await this.answerCallbackQuery(callbackQuery.id, '⚠️ 消息已过期，请重新发送');
+          return;
+        }
+
+        await this.forwardMessage(message, channel);
 
         if (callbackQuery.message?.message_id) {
           await this.updateButtonStatus(
-            String(chatId),
+            String(callbackQuery.message.chat.id),
             callbackQuery.message.message_id,
             `${channel.alias} ✅`
           );
@@ -78,8 +77,14 @@ export class MessageRouter {
   }
 
   private async handleCommand(message: TelegramMessage): Promise<void> {
-    const text = message.text.trim();
-    const parts = text.split(/\s+/);
+    const text = message.text;
+    if (!text) {
+      await this.telegramClient.sendMessage(String(message.chat.id), '⚠️ 命令格式错误');
+      return;
+    }
+
+    const trimmedText = text.trim();
+    const parts = trimmedText.split(/\s+/);
     const command = parts[0];
     const args = parts.slice(1).join(' ');
 
@@ -148,30 +153,10 @@ export class MessageRouter {
     }
   }
 
-  private async forwardMessageById(
-    messageId: number,
-    chatId: string,
+  private async forwardMessage(
+    message: TelegramMessage,
     channel: { id: string; alias: string }
   ): Promise<void> {
-    const url = `${this.telegramClient['baseUrl']}/getMessage`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        chat_id: chatId,
-        message_id: messageId
-      })
-    });
-
-    const result = await response.json();
-
-    if (!result.ok) {
-      throw new Error(`Failed to get message: ${result.description || 'Unknown error'}`);
-    }
-
-    const message: TelegramMessage = result.result;
     const classification = classifyMessage(message);
 
     switch (classification.type) {

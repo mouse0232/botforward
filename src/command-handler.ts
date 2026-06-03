@@ -46,15 +46,11 @@ export class CommandHandler {
 
       await this.forwardMessage(replyToMessage, channel, chatId);
     } else {
-      const replyMarkup = this.channelSelector.generateChannelButtons(
-        undefined,
-        replyToMessage.message_id
-      );
-      await this.telegramClient.sendMessageWithButtons(
-        String(chatId),
-        '请选择转发频道：',
-        replyMarkup
-      );
+      const messageId = replyToMessage.message_id;
+      const cacheKey = `${userId}:${messageId}`;
+      this.channelSelector.cacheMessage(cacheKey, replyToMessage);
+
+      await this.channelSelector.showChannelSelection(userId, chatId, messageId);
     }
   }
 

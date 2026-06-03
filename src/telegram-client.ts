@@ -236,11 +236,11 @@ export class TelegramClientImpl implements TelegramClient {
     const url = `${this.baseUrl}/getMe`;
     const response = await fetch(url);
     const result = await response.json();
-    
+
     if (!result.ok) {
       throw new Error(`Telegram API error: ${result.description || 'Unknown error'}`);
     }
-    
+
     return result.result;
   }
 }

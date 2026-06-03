@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { TelegramMessage } from './types';
+import { TelegramMessage, classifyMessage } from './types';
 import { WorkersAIProcessor } from './ai-processor';
 import { TelegramClientImpl } from './telegram-client';
 import { ForwardHandler } from './forward-handler';
@@ -42,7 +42,7 @@ app.post('/webhook', async (c) => {
       return await handleLegacyWebhook(body, env, botToken, aiModel, maxLength, timeout);
     }
 
-    const channelConfig = new ChannelConfigManager(env.TELEGRAM_CHANNELS);
+    const channelConfig = new ChannelConfigManager(env.TELEGRAM_CHANNELS || '');
     const telegramClient = new TelegramClientImpl(botToken);
     const aiProcessor = new WorkersAIProcessor(env.AI, aiModel, timeout);
     const forwardHandler = new ForwardHandler(aiProcessor, telegramClient, { maxLength });
@@ -84,7 +84,7 @@ async function handleLegacyWebhook(
 
   if (!channelId) {
     console.error('Missing required environment variable: TELEGRAM_CHANNEL_ID');
-    return new Response('Configuration error', 500);
+    return new Response('Configuration error', { status: 500 });
   }
 
   const classification = classifyMessage(message);
