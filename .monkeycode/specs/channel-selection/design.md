@@ -123,30 +123,40 @@ export class ChannelSelector {
     telegramClient: TelegramClient
   );
 
-  showChannelSelection(userId: number, chatId: number): Promise<void>;
-  showChannelSelectionInline(
-    userId: number,
-    chatId: number,
-    message: TelegramMessage
-  ): Promise<void>;
-  handleChannelSelection(
-    userId: number,
-    channelId: string,
-    state: ChannelSelectionState
-  ): Promise<void>;
+  generateChannelButtons(messageId?: number): InlineKeyboardMarkup;
+  getChannelFromCallbackData(data: string): { alias: string; messageId?: number } | null;
+  showChannelSelection(userId: number, chatId: number, messageId?: number): Promise<void>;
+  formatChannelList(): string;
+
+  cacheMessage(key: string, message: TelegramMessage): void;
+  getCachedMessage(key: string): TelegramMessage | null;
 }
+
+// callback_data 格式：
+// 选择频道：s:<alias>  (select:tech)
+// 转发消息：f:<messageId>:<alias>  (forward:12345:tech)
+// 注意：使用缩写避免超过 64 字节限制
 ```
 
-### 4.3 Message Buffer 模块接口
+### 4.3 Command Handler 模块接口
 
 ```typescript
-export class MessageBuffer {
-  constructor(storage: KVNamespace | D1Database);
+export class CommandHandler {
+  constructor(
+    channelSelector: ChannelSelector,
+    channelConfig: ChannelConfigManager,
+    telegramClient: TelegramClient,
+    forwardHandler: ForwardHandler
+  );
 
-  bufferMessage(userId: number, message: TelegramMessage): Promise<string>;
-  getBufferedMessage(key: string): Promise<BufferedMessage | null>;
-  removeBufferedMessage(key: string): Promise<void>;
-  cleanupExpiredMessages(): Promise<void>;
+  handleForwardCommand(
+    userId: number,
+    chatId: number,
+    replyToMessage: TelegramMessage | null,
+    args?: string
+  ): Promise<void>;
+  handleListCommand(userId: number, chatId: number): Promise<void>;
+  handleStartCommand(userId: number, chatId: number): Promise<void>;
 }
 ```
 
@@ -279,6 +289,12 @@ BUFFERED_MESSAGE_TTL=3600
 - 不包含 `:` - 目标本身当作别名
 - 支持 `@username` 格式
 - 支持数字 ID 格式（如 `-1001234567890`）
+- 第一个频道标记为默认频道
+
+**配置验证：**
+- 拒绝空的别名或 ID
+- 拒绝重复的别名或 ID
+- 非法配置会被跳过并记录警告日志
 
 ---
 
@@ -344,8 +360,11 @@ BUFFERED_MESSAGE_TTL=3600
 |------|---------|------|
 | 消息获取 | Telegram reply_to_message_id | 原生功能，无需存储 |
 | 消息传递 | callback_data | 内联按钮传递消息 ID |
+| 消息缓存 | 内存 Map | 短期暂存，快速访问 |
 | 配置管理 | 环境变量 | 简单、无需额外依赖 |
 | 频道选择界面 | Telegram Inline Keyboard | 用户体验好、易于实现 |
+
+**注意：消息缓存在 Worker 重启后会丢失，需要用户重新发送消息。**
 
 ---
 
@@ -410,8 +429,6 @@ BUFFERED_MESSAGE_TTL=3600
 ### 12.1 环境变量配置检查清单
 
 - [ ] TELEGRAM_CHANNELS 配置正确
-- [ ] CHANNEL_SELECTION_TIMEOUT 设置合理
-- [ ] BUFFERED_MESSAGE_TTL 设置合理
 - [ ] TELEGRAM_BOT_TOKEN 有效
 
 ### 12.2 监控指标
@@ -452,6 +469,8 @@ BUFFERED_MESSAGE_TTL=3600
 
 ### 14.1 可能的扩展功能
 
+- 支持配置文件管理（替代环境变量）
+- 支持配置热更新（无需重启）
 - 支持用户自定义频道收藏
 - 支持消息批量转发
 - 支持定时转发
