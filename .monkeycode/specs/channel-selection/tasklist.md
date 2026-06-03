@@ -43,34 +43,33 @@
 
 ---
 
-### Task-1.2: 创建消息缓冲模块
+### Task-1.2: 扩展 TelegramClient 支持内联按钮
 
 **优先级**: P0
-**预计工时**: 2 小时
+**预计工时**: 1-2 小时
 **负责人**: -
 **状态**: 待开始
 
 **任务描述**:
-创建 `src/message-buffer.ts` 文件，实现消息的临时存储和管理。
+扩展 `src/telegram-client.ts`，添加内联按钮相关的方法。
 
 **具体步骤**:
-1. 定义 `BufferedMessage` 接口
-2. 实现 `MessageBuffer` 类
-3. 实现消息存储逻辑（使用 KV）
-4. 实现消息读取逻辑
-5. 实现消息删除逻辑
-6. 实现过期消息清理逻辑
-7. 添加 TTL 设置
+1. 添加 `sendMessageWithButtons()` 方法
+   - 参数：chatId, text, buttons[][]
+   - 返回：Promise<void>
+2. 添加 `editMessageReplyMarkup()` 方法
+   - 参数：chatId, messageId, replyMarkup
+   - 返回：Promise<void>
+3. 支持内联按钮格式
+4. 支持按钮状态更新
 
 **验收标准**:
-- [ ] `bufferMessage()` 能成功存储消息
-- [ ] `getBufferedMessage()` 能正确读取消息
-- [ ] `removeBufferedMessage()` 能删除消息
-- [ ] `cleanupExpiredMessages()` 能清理过期消息
-- [ ] 存储的消息包含完整的 TelegramMessage 信息
+- [ ] `sendMessageWithButtons()` 能发送带按钮的消息
+- [ ] `editMessageReplyMarkup()` 能更新按钮状态
+- [ ] 支持 callback_data 编码/解码
+- [ ] 符合 Telegram Bot API 规范
 
-**依赖**:
-- KV Namespace 已配置
+**依赖**: 无
 
 ---
 
@@ -130,7 +129,6 @@
 
 **依赖**:
 - Task-1.1（ChannelConfigManager）
-- Task-1.2（MessageBuffer）
 
 ---
 
@@ -147,6 +145,7 @@
 **具体步骤**:
 1. 实现 `CommandHandler` 类
 2. 实现 `/forward` 命令处理
+   - 支持 reply_to_message_id
    - 不带参数：显示频道选择界面
    - 带参数：直接转发到指定频道
 3. 实现 `/list` 命令处理（显示所有可用频道）
@@ -155,7 +154,7 @@
 6. 添加错误处理
 
 **验收标准**:
-- [ ] `/forward` 能正确启动频道选择流程
+- [ ] `/forward` 能正确处理回复消息
 - [ ] `/forward main` 能直接转发到 main 频道
 - [ ] `/list` 能显示所有频道列表
 - [ ] `/start` 能显示帮助信息
@@ -164,7 +163,6 @@
 **依赖**:
 - Task-2.1（ChannelSelector）
 - Task-1.1（ChannelConfigManager）
-- Task-1.2（MessageBuffer）
 - Task-1.3（ForwardHandler）
 
 ---
@@ -212,13 +210,12 @@
 **具体步骤**:
 1. 添加新的环境变量定义
 2. 实例化 ChannelConfigManager
-3. 实例化 MessageBuffer
-4. 实例化 ChannelSelector
-5. 实例化 CommandHandler
-6. 实例化 MessageRouter
-7. 更新 webhook 端点，使用 MessageRouter
-8. 更新回调查询处理逻辑
-9. 更新健康检查端点
+3. 实例化 ChannelSelector
+4. 实例化 CommandHandler
+5. 实例化 MessageRouter
+6. 更新 webhook 端点，使用 MessageRouter
+7. 更新回调查询处理逻辑
+8. 更新健康检查端点
 
 **验收标准**:
 - [ ] Webhook 能正确处理所有类型的消息
@@ -364,10 +361,9 @@
 
 **具体步骤**:
 1. 为 ChannelConfigManager 编写测试
-2. 为 MessageBuffer 编写测试
-3. 为 ChannelSelector 编写测试
-4. 为 CommandHandler 编写测试
-5. 为 MessageRouter 编写测试
+2. 为 ChannelSelector 编写测试
+3. 为 CommandHandler 编写测试
+4. 为 MessageRouter 编写测试
 
 **验收标准**:
 - [ ] 核心逻辑有完整的测试覆盖
@@ -450,14 +446,10 @@
 配置 Cloudflare Workers 的运行环境。
 
 **具体步骤**:
-1. 创建 KV Namespace
-2. 绑定 KV Namespace 到 Worker
-3. 配置环境变量
-4. 测试配置是否生效
+1. 配置环境变量
+2. 测试配置是否生效
 
 **验收标准**:
-- [ ] KV Namespace 创建成功
-- [ ] KV 绑定正确
 - [ ] 环境变量配置正确
 - [ ] Worker 能正常启动
 
@@ -498,23 +490,16 @@
 
 ```
 阶段一：
-Task-1.1 ─────┐
-             ├─▶ Task-1.3 ──┐
-Task-1.2 ─────┘              │
-                            ▼
-阶段二：                     │
-Task-2.1 ──▶ Task-2.2 ──────┤
-             │              │
-             ▼              │
-          Task-2.3 ────────┘
-             │
-             ▼
-          Task-2.4
+Task-1.1 ──▶ Task-1.2 ──▶ Task-1.3
+    │                         │
+    └─────────────────────────┘
+
+阶段二：
+Task-2.1 ──▶ Task-2.2 ──▶ Task-2.3 ──▶ Task-2.4
 
 阶段三：
 Task-3.1 ──▶ Task-3.2
-             │
-             ▼
+
 阶段四：
 Task-4.1 ──▶ Task-4.2
 
@@ -539,23 +524,22 @@ Task-6.1 ──▶ Task-6.2
 
 | 阶段 | 预计工时 |
 |------|---------|
-| 阶段一：基础架构 | 4-6 小时 |
+| 阶段一：基础架构 | 3-5 小时 |
 | 阶段二：命令交互模式 | 6-8 小时 |
 | 阶段三：频道选择界面优化 | 2-3 小时 |
 | 阶段四：错误处理和优化 | 3-4 小时 |
 | 阶段五：测试和文档 | 2-3 小时 |
-| 阶段六：部署和上线 | 1-2 小时 |
-| **总计** | **18-26 小时** |
+| 阶段六：部署和上线 | 0.5-1 小时 |
+| **总计** | **16.5-24 小时** |
 
 ---
 
 ## 风险和注意事项
 
-1. **KV 存储限制**: 注意 KV 的读写限制和成本
-2. **环境变量长度**: 如果频道配置很大，可能需要改用数据库
-3. **向后兼容性**: 确保现有功能不受影响
-4. **测试覆盖**: 重点测试边缘情况和错误场景
-5. **用户体验**: 频道选择流程要简单直观
+1. **环境变量长度**: 如果频道配置很大，可能需要改用数据库
+2. **向后兼容性**: 确保现有功能不受影响
+3. **测试覆盖**: 重点测试边缘情况和错误场景
+4. **用户体验**: 频道选择流程要简单直观
 
 ---
 

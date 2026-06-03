@@ -92,13 +92,7 @@ export interface ChannelSelectionState {
 ### 3.3 暂存消息结构
 
 ```typescript
-export interface BufferedMessage {
-  userId: number;
-  messageId: number;
-  chatId: number;
-  message: TelegramMessage;
-  createdAt: number;
-}
+// 不需要存储，通过 Telegram 回复机制或 callback_data 获取消息
 ```
 
 ---
@@ -163,13 +157,13 @@ export class CommandHandler {
   constructor(
     channelSelector: ChannelSelector,
     channelConfig: ChannelConfigManager,
-    messageBuffer: MessageBuffer,
-    forwardHandler: ForwardHandler
+    telegramClient: TelegramClient
   );
 
   handleForwardCommand(
     userId: number,
     chatId: number,
+    replyToMessageId?: number,
     args?: string
   ): Promise<void>;
   handleListCommand(userId: number, chatId: number): Promise<void>;
@@ -181,66 +175,70 @@ export class CommandHandler {
 
 ## 5. 交互流程设计
 
-### 5.1 方案一：命令模式（推荐优先实现）
+### 5.1 方案 A：回复消息 + 命令（推荐）
 
-#### 流程 A：通过 /forward 命令启动选择流程
-
-```
-用户发送消息
-    ↓
-系统暂存消息到 Message Buffer
-    ↓
-用户发送 /forward
-    ↓
-系统显示频道列表（使用内联按钮或消息列表）
-    ↓
-用户选择频道
-    ↓
-系统从 Buffer 获取消息并转发到选定频道
-    ↓
-发送成功确认消息
-```
-
-#### 流程 B：通过 /forward <频道别名> 直接转发
+#### 流程 A：回复消息 + 频道选择列表
 
 ```
-用户发送消息
+用户发送消息：https://example.com/article
     ↓
-用户发送 /forward channel1
+Bot 收到消息，暂不转发
     ↓
-系统从 Buffer 获取最新消息
+用户回复这条消息：/forward
     ↓
-系统查询 channel1 对应的频道 ID
+Bot 识别 reply_to_message_id，获取要转发的消息
     ↓
-系统转发消息到 channel1
+Bot 显示频道列表（内联按钮）
     ↓
-发送成功确认消息
+用户点击频道按钮
+    ↓
+Bot 把消息转发到选定频道
 ```
 
-### 5.2 方案二：内联按钮模式（增强用户体验）
+#### 流程 B：回复消息 + 直接指定频道
+
+```
+用户发送消息：https://example.com/article
+    ↓
+Bot 收到消息，暂不转发
+    ↓
+用户回复这条消息：/forward tech
+    ↓
+Bot 识别 reply_to_message_id 和频道参数
+    ↓
+Bot 把消息转发到 tech 频道
+```
+
+### 5.2 方案 B：内联按钮 + callback_data
 
 #### 流程：消息即时转发模式
 
 ```
-用户发送消息
+用户发送消息：https://example.com/article
     ↓
-系统暂存消息
+Bot 收到消息
     ↓
-系统附加频道选择内联按钮到回复消息
+Bot 回复消息并附加频道选择按钮
+    按钮格式：
+    callback_data = "MSG_ID:CHANNEL_ALIAS"
+    示例：callback_data = "123:main"
     ↓
 用户点击频道按钮
     ↓
-系统转发消息到选定频道
+Bot 从 callback_data 解析出消息 ID 和频道
     ↓
-更新按钮状态为"已转发"
+Bot 转发消息
+    ↓
+更新按钮状态为"✓ 已转发"
 ```
 
-### 5.3 方案三：混合模式（最优方案）
+### 5.3 方案 C：混合模式（最优方案）
 
-结合命令模式和内联按钮模式：
-- 优先使用内联按钮提供快速选择
-- 同时支持命令模式作为备选
-- 对于长消息或复杂内容，使用命令模式
+结合方案 A 和方案 B：
+- 收到消息后，同时提供两种方式：
+  - 回复 `/forward` 命令
+  - 内联按钮快速选择
+- 适应不同使用习惯
 
 ---
 
@@ -290,44 +288,43 @@ BUFFERED_MESSAGE_TTL=3600
 
 1. **创建频道配置模块** (`src/channel-config.ts`)
    - 实现 `ChannelConfigManager` 类
-   - 支持从环境变量加载配置
-   - 实现频道查询和验证功能
+   - 从环境变量解析配置
+   - 实现频道查询功能
 
-2. **创建消息缓冲模块** (`src/message-buffer.ts`)
-   - 使用 KV 存储暂存消息
-   - 实现消息的存取和清理逻辑
-
-3. **修改 ForwardHandler** (`src/forward-handler.ts`)
+2. **修改 ForwardHandler** (`src/forward-handler.ts`)
    - 支持动态指定频道 ID
    - 保持现有功能不变
 
-### 阶段二：命令交互模式（P0）
+3. **扩展 TelegramClient** (`src/telegram-client.ts`)
+   - 添加 `editMessageReplyMarkup` 方法（更新按钮状态）
+   - 添加 `sendMessageWithButtons` 方法（发送带按钮的消息）
+
+### 阶段二：命令处理器（P0）
 
 4. **创建命令处理器** (`src/command-handler.ts`)
-   - 实现 `/forward` 命令
+   - 实现 `/forward` 命令（处理回复消息）
    - 实现 `/forward <alias>` 命令
    - 实现 `/list` 命令
    - 实现 `/start` 命令（显示帮助）
 
-5. **创建消息路由器** (`src/message-router.ts`)
-   - 识别命令和普通消息
-   - 路由到相应的处理器
-
-6. **修改主入口** (`src/index.ts`)
-   - 集成 MessageRouter
-   - 更新 Webhook 处理逻辑
-
-### 阶段三：频道选择界面（P1）
-
-7. **创建频道选择器** (`src/channel-selector.ts`)
+5. **创建频道选择器** (`src/channel-selector.ts`)
    - 实现频道列表展示
    - 实现内联按钮生成
+   - 实现按钮 callback_data 编码/解码
 
-8. **添加回调处理**
-   - 处理内联按钮回调
-   - 处理频道选择逻辑
+6. **创建消息路由器** (`src/message-router.ts`)
+   - 识别命令和普通消息
+   - 处理回调查询
+   - 路由到相应的处理器
 
-### 阶段四：增强功能（P2）
+### 阶段三：主入口集成（P0）
+
+7. **修改主入口** (`src/index.ts`)
+   - 集成 MessageRouter
+   - 处理回调查询
+   - 更新 Webhook 处理逻辑
+
+### 阶段四：增强功能（P1）
 
 9. **添加错误处理和日志**
    - 频道权限检查
@@ -345,10 +342,10 @@ BUFFERED_MESSAGE_TTL=3600
 
 | 组件 | 技术选型 | 理由 |
 |------|---------|------|
-| 消息存储 | Cloudflare KV | 低延迟、自动过期、适合临时存储 |
+| 消息获取 | Telegram reply_to_message_id | 原生功能，无需存储 |
+| 消息传递 | callback_data | 内联按钮传递消息 ID |
 | 配置管理 | 环境变量 | 简单、无需额外依赖 |
 | 频道选择界面 | Telegram Inline Keyboard | 用户体验好、易于实现 |
-| 状态管理 | 内存 + KV | 低延迟、无需数据库 |
 
 ---
 
@@ -359,29 +356,25 @@ BUFFERED_MESSAGE_TTL=3600
 | 错误类型 | 处理方式 | 用户提示 |
 |---------|---------|---------|
 | 频道不存在 | 返回频道列表 | "请选择有效的频道" |
-| 频道已禁用 | 返回可用频道列表 | "该频道当前不可用" |
+| 频道别名无效 | 返回可用频道列表 | "无效的频道别名" |
 | 无权限访问 | 记录错误并提示 | "无权限访问该频道" |
+| 未回复消息 | 提示使用方法 | "请回复要转发的消息并使用 /forward" |
 
 ### 9.2 消息转发错误
 
 | 错误类型 | 处理方式 | 用户提示 |
 |---------|---------|---------|
-| 消息已过期 | 清理缓存 | "消息已过期，请重新发送" |
-| 消息不存在 | 提示重新发送 | "未找到待转发消息" |
+| 消息不存在 | 检查 reply_to_message_id | "未找到要转发的消息，请回复正确的消息" |
+| 消息 ID 无效 | 验证 callback_data | "消息 ID 无效" |
 | 转发失败 | 重试 1 次后放弃 | "转发失败，请稍后重试" |
 
 ---
 
 ## 10. 性能优化
 
-### 10.1 KV 存储优化
-- 设置合理的 TTL 避免数据堆积
-- 使用批量操作减少请求次数
-- 实现定期清理过期消息
-
-### 10.2 响应优化
+### 10.1 响应优化
 - 异步处理转发操作
-- 使用流式响应（如适用）
+- 快速响应用户操作（即使转发未完成）
 - 缓存频道配置
 
 ---
@@ -391,7 +384,6 @@ BUFFERED_MESSAGE_TTL=3600
 ### 11.1 单元测试
 
 - `ChannelConfigManager` 测试
-- `MessageBuffer` 测试
 - `CommandHandler` 测试
 - `ChannelSelector` 测试
 
@@ -421,14 +413,12 @@ BUFFERED_MESSAGE_TTL=3600
 - [ ] CHANNEL_SELECTION_TIMEOUT 设置合理
 - [ ] BUFFERED_MESSAGE_TTL 设置合理
 - [ ] TELEGRAM_BOT_TOKEN 有效
-- [ ] KV Namespace 已绑定
 
 ### 12.2 监控指标
 
 - 频道选择成功率
 - 消息转发成功率
 - 平均响应时间
-- KV 存储使用量
 
 ### 12.3 日志规范
 
@@ -436,7 +426,6 @@ BUFFERED_MESSAGE_TTL=3600
 [INFO] User {userId} selected channel {channelId}
 [INFO] Message {messageId} forwarded to channel {channelId}
 [ERROR] Failed to forward message {messageId}: {error}
-[WARN] Channel selection timeout for user {userId}
 ```
 
 ---
@@ -471,7 +460,6 @@ BUFFERED_MESSAGE_TTL=3600
 ### 14.2 架构扩展预留
 
 - Channel Selector 支持插件化扩展
-- Message Buffer 支持多种存储后端
 - Command Handler 支持自定义命令注册
 
 ---
@@ -480,9 +468,8 @@ BUFFERED_MESSAGE_TTL=3600
 
 | 风险 | 影响 | 概率 | 应对措施 |
 |------|------|------|---------|
-| KV 存储成本过高 | 中 | 低 | 设置合理的 TTL，定期清理 |
 | 频道配置错误导致无法转发 | 高 | 中 | 提供配置验证和默认频道 |
-| 用户选择超时导致消息丢失 | 中 | 中 | 实现超时提醒和重试机制 |
+| reply_to_message_id 不可用 | 低 | 低 | 同时提供内联按钮模式 |
 | 内联按钮在某些客户端不可用 | 低 | 低 | 同时提供命令模式备选 |
 
 ---
