@@ -134,12 +134,19 @@ export class MessageRouter {
       return;
     }
 
-    // 缓存消息（键包含 chat.id，防止跨会话冲突）
+    // 如果只有一个频道，直接转发
+    if (channels.length === 1) {
+      const channel = channels[0];
+      await this.forwardMessage(message, channel);
+      console.log(`Auto forwarded to single channel: ${channel.alias}`);
+      return;
+    }
+
+    // 多个频道时，显示选择按钮
     const cacheKey = `${chatId}:${messageId}`;
     console.log('Cache key for message:', cacheKey);
     await this.channelSelector.cacheMessage(cacheKey, message);
 
-    // 发送带按钮的消息
     const replyMarkup = this.channelSelector.generateChannelButtons(messageId);
     await this.telegramClient.sendMessageWithButtons(
       chatId,
