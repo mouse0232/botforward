@@ -20,6 +20,49 @@ interface Env {
 
 const app = new Hono<{ Bindings: Env }>();
 
+// 自动设置命令菜单
+async function setBotCommands(botToken: string): Promise<void> {
+  try {
+    const url = `https://api.telegram.org/bot${botToken}/setMyCommands`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        commands: [
+          { command: 'start', description: '显示帮助信息' },
+          { command: 'help', description: '显示帮助信息' },
+          { command: 'forward', description: '转发消息到指定频道' },
+          { command: 'list', description: '查看所有可用频道' }
+        ]
+      })
+    });
+
+    const result = await response.json();
+    if (result.ok) {
+      console.log('Bot commands set successfully');
+    } else {
+      console.error('Failed to set bot commands:', result.description);
+    }
+  } catch (error) {
+    console.error('Error setting bot commands:', error);
+  }
+}
+
+// 初始化标记
+let isInitialized = false;
+
+// 初始化 Bot 命令
+async function initializeBot(botToken: string): Promise<void> {
+  if (isInitialized) {
+    return;
+  }
+
+  await setBotCommands(botToken);
+  isInitialized = true;
+}
+
 app.post('/webhook', async (c) => {
   try {
     const body = await c.req.json();
@@ -27,6 +70,10 @@ app.post('/webhook', async (c) => {
 
     const env = c.env;
     const botToken = env.TELEGRAM_BOT_TOKEN;
+
+    // 自动初始化 Bot 命令
+    await initializeBot(botToken);
+
     const aiModel = env.WORKERS_AI_MODEL || '@cf/meta/llama-3-8b-instruct';
     const maxLength = parseInt(env.SUMMARY_MAX_LENGTH || '200', 10);
     const timeout = parseInt(env.REQUEST_TIMEOUT || '30000', 10);
@@ -168,25 +215,17 @@ app.get('/set-commands', async (c) => {
     return c.text('Missing TELEGRAM_BOT_TOKEN', 400);
   }
 
-  const url = `https://api.telegram.org/bot${botToken}/setMyCommands`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      commands: [
-        { command: 'start', description: '显示帮助信息' },
-        { command: 'help', description: '显示帮助信息' },
-        { command: 'forward', description: '转发消息到指定频道' },
-        { command: 'list', description: '查看所有可用频道' }
-      ]
-    })
-  });
+  await initializeBot(botToken);
 
+  const url = `https://api.telegram.org/bot${botToken}/getMyCommands`;
+  const response = await fetch(url);
   const result = await response.json();
 
-  return c.json(result);
+  return c.json({
+    success: true,
+    message: 'Commands initialized',
+    commands: result.result
+  });
 });
 
 export default app;
