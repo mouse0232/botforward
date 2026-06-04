@@ -16,6 +16,7 @@ interface Env {
   SUMMARY_MAX_LENGTH: string;
   REQUEST_TIMEOUT: string;
   AI: any;
+  MESSAGE_CACHE?: KVNamespace;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -100,7 +101,7 @@ app.post('/webhook', async (c) => {
     const telegramClient = new TelegramClientImpl(botToken);
     const aiProcessor = new WorkersAIProcessor(env.AI, aiModel, timeout);
     const forwardHandler = new ForwardHandler(aiProcessor, telegramClient, { maxLength });
-    const channelSelector = new ChannelSelector(channelConfig, telegramClient);
+    const channelSelector = new ChannelSelector(channelConfig, telegramClient, env.MESSAGE_CACHE);
     const commandHandler = new CommandHandler(channelConfig, channelSelector, telegramClient, forwardHandler);
     const messageRouter = new MessageRouter(telegramClient, channelConfig, channelSelector, commandHandler, forwardHandler);
 
