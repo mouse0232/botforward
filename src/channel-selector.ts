@@ -20,9 +20,9 @@ export class ChannelSelector {
         await this.kvCache.put(key, JSON.stringify(message), {
           expirationTtl: 300 // 5分钟
         });
-        return;
+        // 同时写入内存镜像（KV 最终一致性保障）
       } catch (error) {
-        console.warn('KV cache write failed, falling back to memory cache:', error);
+        console.warn('KV cache write failed, using memory cache:', error);
       }
     }
 
@@ -48,8 +48,12 @@ export class ChannelSelector {
       try {
         const cached = await this.kvCache.get(key, 'json');
         if (cached) {
-          await this.kvCache.delete(key);
-          return cached as TelegramMessage;
+          const message = cached as TelegramMessage;
+          // 异步删除，不影响返回结果
+          this.kvCache.delete(key).catch(err => {
+            console.warn('Failed to delete from KV:', err);
+          });
+          return message;
         }
       } catch (error) {
         console.warn('KV cache read failed, falling back to memory cache:', error);
@@ -94,11 +98,32 @@ export class ChannelSelector {
     return { inline_keyboard: buttons };
   }
 
-  getChannelFromCallbackData(data: string): { alias: string; messageId?: number } | null {
+getChannelFromCallbackData(data: string): { alias: string; messageId?: number } | null {
     if (data.startsWith('s:')) {
       const alias = data.substring(2);
       return { alias };
+    } else if (data.startsWith('f:')) {
+      const parts = data.substring(2).split(':');
+      if (parts.length === 2) {
+        const messageId = parseInt(parts[0], 10);
+        const alias = parts[1];
+        if (!isNaN(messageId)) {
+          return { messageId, alias };
+        }
+      }
     }
+    return null;
+  }
+
+  private cleanupExpiredMessages(): void {
+    const now = Date.now();
+    for (const [key, value] of this.messageCache.entries()) {
+      if (now - value.timestamp > this.CACHE_TTL) {
+        this.messageCache.delete(key);
+      }
+    }
+  }
+}
 
     if (data.startsWith('f:')) {
       const parts = data.substring(2).split(':');

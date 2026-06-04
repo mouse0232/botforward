@@ -5,7 +5,12 @@ compatibility_date = "2024-01-01"
 [ai]
 binding = "AI"
 
+# 预览环境使用独立的 KV namespace
 [[kv_namespaces]]
 binding = "MESSAGE_CACHE"
 id = "a2eec8ca45f44211b20ed98d662ab42b"
-preview_id = "a2eec8ca45f44211b20ed98d662ab42b"
+
+# 如果需要创建预览环境的独立 namespace，请运行：
+# wrangler kv namespace create "MESSAGE_CACHE" --preview
+# 然后将返回的 preview_id 添加到下面的配置中
+# preview_id = "your-preview-namespace-id"
