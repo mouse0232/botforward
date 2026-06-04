@@ -2,7 +2,9 @@ import { ChannelConfigManager, ChannelConfig } from './channel-config';
 import { TelegramClient, InlineKeyboardMarkup, InlineKeyboardButton } from './telegram-client';
 
 export class ChannelSelector {
-  private messageCache: Map<string, TelegramMessage> = new Map();
+  private messageCache: Map<string, { message: TelegramMessage; timestamp: number }> = new Map();
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5分钟
+  private readonly MAX_CACHE_SIZE = 100; // 最多缓存100条消息
 
   constructor(
     private channelConfig: ChannelConfigManager,
@@ -10,16 +12,45 @@ export class ChannelSelector {
   ) {}
 
   cacheMessage(key: string, message: TelegramMessage): void {
-    this.messageCache.set(key, message);
+    // 清理过期消息
+    this.cleanupExpiredMessages();
+
+    // 如果超过大小限制，删除最旧的
+    if (this.messageCache.size >= this.MAX_CACHE_SIZE) {
+      const oldestKey = this.messageCache.keys().next().value;
+      if (oldestKey) {
+        this.messageCache.delete(oldestKey);
+      }
+    }
+
+    this.messageCache.set(key, {
+      message,
+      timestamp: Date.now()
+    });
   }
 
   getCachedMessage(key: string): TelegramMessage | null {
-    const msg = this.messageCache.get(key);
-    if (msg) {
-      this.messageCache.delete(key);
-      return msg;
+    const cached = this.messageCache.get(key);
+    if (!cached) {
+      return null;
     }
-    return null;
+
+    if (Date.now() - cached.timestamp > this.CACHE_TTL) {
+      this.messageCache.delete(key);
+      return null;
+    }
+
+    this.messageCache.delete(key);
+    return cached.message;
+  }
+
+  private cleanupExpiredMessages(): void {
+    const now = Date.now();
+    for (const [key, value] of this.messageCache.entries()) {
+      if (now - value.timestamp > this.CACHE_TTL) {
+        this.messageCache.delete(key);
+      }
+    }
   }
 
   generateChannelButtons(messageId?: number): InlineKeyboardMarkup {

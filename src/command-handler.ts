@@ -47,7 +47,7 @@ export class CommandHandler {
       await this.forwardMessage(replyToMessage, channel, chatId);
     } else {
       const messageId = replyToMessage.message_id;
-      const cacheKey = `${userId}:${messageId}`;
+      const cacheKey = `${chatId}:${messageId}`;
       this.channelSelector.cacheMessage(cacheKey, replyToMessage);
 
       await this.channelSelector.showChannelSelection(userId, chatId, messageId);

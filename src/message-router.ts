@@ -46,8 +46,13 @@ export class MessageRouter {
 
     try {
       if (callbackData.messageId) {
-        const userId = callbackQuery.from.id;
-        const cacheKey = `${userId}:${callbackData.messageId}`;
+        const chatId = callbackQuery.message?.chat.id;
+        if (!chatId) {
+          await this.answerCallbackQuery(callbackQuery.id, '⚠️ 无法获取会话信息');
+          return;
+        }
+
+        const cacheKey = `${chatId}:${callbackData.messageId}`;
         const message = this.channelSelector.getCachedMessage(cacheKey);
 
         if (!message) {
@@ -59,7 +64,7 @@ export class MessageRouter {
 
         if (callbackQuery.message?.message_id) {
           await this.updateButtonStatus(
-            String(callbackQuery.message.chat.id),
+            String(chatId),
             callbackQuery.message.message_id,
             `${channel.alias} ✅`
           );
@@ -122,8 +127,8 @@ export class MessageRouter {
       return;
     }
 
-    // 缓存消息
-    const cacheKey = `${userId}:${messageId}`;
+    // 缓存消息（键包含 chat.id，防止跨会话冲突）
+    const cacheKey = `${chatId}:${messageId}`;
     this.channelSelector.cacheMessage(cacheKey, message);
 
     // 发送带按钮的消息
