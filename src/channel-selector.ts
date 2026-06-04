@@ -123,17 +123,6 @@ getChannelFromCallbackData(data: string): { alias: string; messageId?: number } 
       }
     }
   }
-}
-
-    if (data.startsWith('f:')) {
-      const parts = data.substring(2).split(':');
-      if (parts.length === 2) {
-        return { alias: parts[1], messageId: parseInt(parts[0], 10) };
-      }
-    }
-
-    return null;
-  }
 
   async showChannelSelection(userId: number, chatId: number, messageId?: number): Promise<void> {
     const channels = this.channelConfig.getAllChannels();
