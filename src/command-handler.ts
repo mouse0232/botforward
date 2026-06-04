@@ -46,11 +46,18 @@ export class CommandHandler {
 
       await this.forwardMessage(replyToMessage, channel, chatId);
     } else {
-      const messageId = replyToMessage.message_id;
-      const cacheKey = `${chatId}:${messageId}`;
-      await this.channelSelector.cacheMessage(cacheKey, replyToMessage);
-
-      await this.channelSelector.showChannelSelection(userId, chatId, messageId);
+      // 没有参数时，检查是否只有一个频道
+      const channels = this.channelConfig.getAllChannels();
+      if (channels.length === 1) {
+        // 只有一个频道，直接转发
+        await this.forwardMessage(replyToMessage, channels[0], chatId);
+      } else {
+        // 多个频道，显示选择按钮
+        const messageId = replyToMessage.message_id;
+        const cacheKey = `${chatId}:${messageId}`;
+        await this.channelSelector.cacheMessage(cacheKey, replyToMessage);
+        await this.channelSelector.showChannelSelection(userId, chatId, messageId);
+      }
     }
   }
 
