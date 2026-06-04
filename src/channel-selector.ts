@@ -1,5 +1,6 @@
 import { ChannelConfigManager, ChannelConfig } from './channel-config';
 import { TelegramClient, InlineKeyboardMarkup, InlineKeyboardButton } from './telegram-client';
+import { TelegramMessage } from './types';
 
 export class ChannelSelector {
   private messageCache: Map<string, { message: TelegramMessage; timestamp: number }> = new Map();
