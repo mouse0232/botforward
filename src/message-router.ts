@@ -120,37 +120,10 @@ export class MessageRouter {
       return;
     }
 
-    const defaultChannel = this.channelConfig.getDefaultChannel();
-    if (!defaultChannel) {
-      await this.telegramClient.sendMessage(
-        chatId,
-        '⚠️ 没有默认频道，请使用 /forward 命令指定频道'
-      );
-      return;
-    }
-
-    const classification = classifyMessage(message);
-
-    try {
-      switch (classification.type) {
-        case 'url':
-          if (classification.url) {
-            await this.forwardHandler.handleUrlMessage(classification.url, defaultChannel.id);
-          }
-          break;
-
-        case 'forwarded':
-          await this.forwardHandler.handleForwardedMessage(message, classification, defaultChannel.id);
-          break;
-
-        case 'other':
-          await this.forwardHandler.handleOtherMessage(message, defaultChannel.id);
-          break;
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Failed to handle regular message:', errorMessage);
-    }
+    await this.telegramClient.sendMessage(
+      chatId,
+      '💡 使用 /forward 命令转发消息到指定频道\n\n' + this.channelSelector.formatChannelList()
+    );
   }
 
   private async forwardMessage(
