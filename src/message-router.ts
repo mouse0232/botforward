@@ -113,6 +113,8 @@ export class MessageRouter {
 
   private async handleRegularMessage(message: TelegramMessage): Promise<void> {
     const chatId = String(message.chat.id);
+    const userId = message.from?.id || message.chat.id;
+    const messageId = message.message_id;
 
     const channels = this.channelConfig.getAllChannels();
     if (channels.length === 0) {
@@ -120,9 +122,16 @@ export class MessageRouter {
       return;
     }
 
-    await this.telegramClient.sendMessage(
+    // 缓存消息
+    const cacheKey = `${userId}:${messageId}`;
+    this.channelSelector.cacheMessage(cacheKey, message);
+
+    // 发送带按钮的消息
+    const replyMarkup = this.channelSelector.generateChannelButtons(messageId);
+    await this.telegramClient.sendMessageWithButtons(
       chatId,
-      '💡 使用 /forward 命令转发消息到指定频道\n\n' + this.channelSelector.formatChannelList()
+      '📋 请选择转发频道：',
+      replyMarkup
     );
   }
 
