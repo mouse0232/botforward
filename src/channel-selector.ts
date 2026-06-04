@@ -9,14 +9,26 @@ export class ChannelSelector {
 
   constructor(
     private channelConfig: ChannelConfigManager,
-    private telegramClient: TelegramClient
+    private telegramClient: TelegramClient,
+    private kvCache?: KVNamespace
   ) {}
 
-  cacheMessage(key: string, message: TelegramMessage): void {
-    // 清理过期消息
+  async cacheMessage(key: string, message: TelegramMessage): Promise<void> {
+    // 优先使用 KV 持久化存储
+    if (this.kvCache) {
+      try {
+        await this.kvCache.put(key, JSON.stringify(message), {
+          expirationTtl: 300 // 5分钟
+        });
+        // 同时写入内存镜像（KV 最终一致性保障）
+      } catch (error) {
+        console.warn('KV cache write failed, using memory cache:', error);
+      }
+    }
+
+    // 回退到内存缓存
     this.cleanupExpiredMessages();
 
-    // 如果超过大小限制，删除最旧的
     if (this.messageCache.size >= this.MAX_CACHE_SIZE) {
       const oldestKey = this.messageCache.keys().next().value;
       if (oldestKey) {
@@ -30,7 +42,27 @@ export class ChannelSelector {
     });
   }
 
-  getCachedMessage(key: string): TelegramMessage | null {
+  async getCachedMessage(key: string): Promise<TelegramMessage | null> {
+    // 优先从 KV 读取
+    if (this.kvCache) {
+      try {
+        const cached = await this.kvCache.get(key, 'json');
+        if (cached) {
+          const message = cached as TelegramMessage;
+          // 同步删除内存缓存
+          this.messageCache.delete(key);
+          // 异步删除 KV，不影响返回结果
+          this.kvCache.delete(key).catch(err => {
+            console.warn('Failed to delete from KV:', err);
+          });
+          return message;
+        }
+      } catch (error) {
+        console.warn('KV cache read failed, falling back to memory cache:', error);
+      }
+    }
+
+    // 回退到内存缓存
     const cached = this.messageCache.get(key);
     if (!cached) {
       return null;
@@ -43,15 +75,6 @@ export class ChannelSelector {
 
     this.messageCache.delete(key);
     return cached.message;
-  }
-
-  private cleanupExpiredMessages(): void {
-    const now = Date.now();
-    for (const [key, value] of this.messageCache.entries()) {
-      if (now - value.timestamp > this.CACHE_TTL) {
-        this.messageCache.delete(key);
-      }
-    }
   }
 
   generateChannelButtons(messageId?: number): InlineKeyboardMarkup {
@@ -77,20 +100,30 @@ export class ChannelSelector {
     return { inline_keyboard: buttons };
   }
 
-  getChannelFromCallbackData(data: string): { alias: string; messageId?: number } | null {
+getChannelFromCallbackData(data: string): { alias: string; messageId?: number } | null {
     if (data.startsWith('s:')) {
       const alias = data.substring(2);
       return { alias };
-    }
-
-    if (data.startsWith('f:')) {
+    } else if (data.startsWith('f:')) {
       const parts = data.substring(2).split(':');
       if (parts.length === 2) {
-        return { alias: parts[1], messageId: parseInt(parts[0], 10) };
+        const messageId = parseInt(parts[0], 10);
+        const alias = parts[1];
+        if (!isNaN(messageId)) {
+          return { messageId, alias };
+        }
       }
     }
-
     return null;
+  }
+
+  private cleanupExpiredMessages(): void {
+    const now = Date.now();
+    for (const [key, value] of this.messageCache.entries()) {
+      if (now - value.timestamp > this.CACHE_TTL) {
+        this.messageCache.delete(key);
+      }
+    }
   }
 
   async showChannelSelection(userId: number, chatId: number, messageId?: number): Promise<void> {

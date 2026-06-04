@@ -57,7 +57,7 @@ export class MessageRouter {
         const cacheKey = `${String(chatId)}:${callbackData.messageId}`;
         console.log('Cache key:', cacheKey);
 
-        const message = this.channelSelector.getCachedMessage(cacheKey);
+        const message = await this.channelSelector.getCachedMessage(cacheKey);
         console.log('Cached message:', message ? 'found' : 'not found');
 
         if (!message) {
@@ -137,7 +137,7 @@ export class MessageRouter {
     // 缓存消息（键包含 chat.id，防止跨会话冲突）
     const cacheKey = `${chatId}:${messageId}`;
     console.log('Cache key for message:', cacheKey);
-    this.channelSelector.cacheMessage(cacheKey, message);
+    await this.channelSelector.cacheMessage(cacheKey, message);
 
     // 发送带按钮的消息
     const replyMarkup = this.channelSelector.generateChannelButtons(messageId);
