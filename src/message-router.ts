@@ -46,8 +46,13 @@ export class MessageRouter {
 
     try {
       if (callbackData.messageId) {
-        const userId = callbackQuery.from.id;
-        const cacheKey = `${userId}:${callbackData.messageId}`;
+        const chatId = callbackQuery.message?.chat.id;
+        if (!chatId) {
+          await this.answerCallbackQuery(callbackQuery.id, '⚠️ 无法获取会话信息');
+          return;
+        }
+
+        const cacheKey = `${chatId}:${callbackData.messageId}`;
         const message = this.channelSelector.getCachedMessage(cacheKey);
 
         if (!message) {
@@ -59,7 +64,7 @@ export class MessageRouter {
 
         if (callbackQuery.message?.message_id) {
           await this.updateButtonStatus(
-            String(callbackQuery.message.chat.id),
+            String(chatId),
             callbackQuery.message.message_id,
             `${channel.alias} ✅`
           );
@@ -113,6 +118,8 @@ export class MessageRouter {
 
   private async handleRegularMessage(message: TelegramMessage): Promise<void> {
     const chatId = String(message.chat.id);
+    const userId = message.from?.id || message.chat.id;
+    const messageId = message.message_id;
 
     const channels = this.channelConfig.getAllChannels();
     if (channels.length === 0) {
@@ -120,37 +127,17 @@ export class MessageRouter {
       return;
     }
 
-    const defaultChannel = this.channelConfig.getDefaultChannel();
-    if (!defaultChannel) {
-      await this.telegramClient.sendMessage(
-        chatId,
-        '⚠️ 没有默认频道，请使用 /forward 命令指定频道'
-      );
-      return;
-    }
+    // 缓存消息（键包含 chat.id，防止跨会话冲突）
+    const cacheKey = `${chatId}:${messageId}`;
+    this.channelSelector.cacheMessage(cacheKey, message);
 
-    const classification = classifyMessage(message);
-
-    try {
-      switch (classification.type) {
-        case 'url':
-          if (classification.url) {
-            await this.forwardHandler.handleUrlMessage(classification.url, defaultChannel.id);
-          }
-          break;
-
-        case 'forwarded':
-          await this.forwardHandler.handleForwardedMessage(message, classification, defaultChannel.id);
-          break;
-
-        case 'other':
-          await this.forwardHandler.handleOtherMessage(message, defaultChannel.id);
-          break;
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Failed to handle regular message:', errorMessage);
-    }
+    // 发送带按钮的消息
+    const replyMarkup = this.channelSelector.generateChannelButtons(messageId);
+    await this.telegramClient.sendMessageWithButtons(
+      chatId,
+      '📋 请选择转发频道：',
+      replyMarkup
+    );
   }
 
   private async forwardMessage(

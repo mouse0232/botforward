@@ -20,6 +20,49 @@ interface Env {
 
 const app = new Hono<{ Bindings: Env }>();
 
+// 初始化 Promise
+let initPromise: Promise<void> | null = null;
+
+// 自动设置命令菜单
+async function setBotCommands(botToken: string): Promise<void> {
+  const url = `https://api.telegram.org/bot${botToken}/setMyCommands`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      commands: [
+        { command: 'start', description: '显示帮助信息' },
+        { command: 'help', description: '显示帮助信息' },
+        { command: 'forward', description: '转发消息到指定频道' },
+        { command: 'list', description: '查看所有可用频道' }
+      ]
+    })
+  });
+
+  const result = await response.json();
+  if (!result.ok) {
+    throw new Error(`Failed to set bot commands: ${result.description}`);
+  }
+
+  console.log('Bot commands set successfully');
+}
+
+// 初始化 Bot 命令
+async function initializeBot(botToken: string): Promise<void> {
+  if (!botToken) {
+    throw new Error('TELEGRAM_BOT_TOKEN is required');
+  }
+
+  if (initPromise) {
+    return initPromise;
+  }
+
+  initPromise = setBotCommands(botToken);
+  return initPromise;
+}
+
 app.post('/webhook', async (c) => {
   try {
     const body = await c.req.json();
@@ -27,6 +70,17 @@ app.post('/webhook', async (c) => {
 
     const env = c.env;
     const botToken = env.TELEGRAM_BOT_TOKEN;
+
+    if (!botToken) {
+      console.error('Missing required environment variable: TELEGRAM_BOT_TOKEN');
+      return c.text('Configuration error', { status: 500 });
+    }
+
+    // 自动初始化 Bot 命令（在后台进行，不阻塞）
+    initializeBot(botToken).catch(error => {
+      console.error('Failed to initialize bot commands:', error);
+    });
+
     const aiModel = env.WORKERS_AI_MODEL || '@cf/meta/llama-3-8b-instruct';
     const maxLength = parseInt(env.SUMMARY_MAX_LENGTH || '200', 10);
     const timeout = parseInt(env.REQUEST_TIMEOUT || '30000', 10);
@@ -159,6 +213,33 @@ app.get('/get-me', async (c) => {
   const result = await response.json();
 
   return c.json(result);
+});
+
+app.post('/set-commands', async (c) => {
+  const botToken = c.env.TELEGRAM_BOT_TOKEN;
+
+  if (!botToken) {
+    return c.text('Missing TELEGRAM_BOT_TOKEN', 400);
+  }
+
+  try {
+    await initializeBot(botToken);
+
+    const url = `https://api.telegram.org/bot${botToken}/getMyCommands`;
+    const response = await fetch(url);
+    const result = await response.json();
+
+    return c.json({
+      success: true,
+      message: 'Commands initialized',
+      commands: result.result
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      message: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
 });
 
 export default app;
