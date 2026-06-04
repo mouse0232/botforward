@@ -49,7 +49,9 @@ export class ChannelSelector {
         const cached = await this.kvCache.get(key, 'json');
         if (cached) {
           const message = cached as TelegramMessage;
-          // 异步删除，不影响返回结果
+          // 同步删除内存缓存
+          this.messageCache.delete(key);
+          // 异步删除 KV，不影响返回结果
           this.kvCache.delete(key).catch(err => {
             console.warn('Failed to delete from KV:', err);
           });
