@@ -47,13 +47,18 @@ export class MessageRouter {
     try {
       if (callbackData.messageId) {
         const chatId = callbackQuery.message?.chat.id;
+        console.log('Callback query chatId:', chatId, 'type:', typeof chatId);
+
         if (!chatId) {
           await this.answerCallbackQuery(callbackQuery.id, '⚠️ 无法获取会话信息');
           return;
         }
 
-        const cacheKey = `${chatId}:${callbackData.messageId}`;
+        const cacheKey = `${String(chatId)}:${callbackData.messageId}`;
+        console.log('Cache key:', cacheKey);
+
         const message = this.channelSelector.getCachedMessage(cacheKey);
+        console.log('Cached message:', message ? 'found' : 'not found');
 
         if (!message) {
           await this.answerCallbackQuery(callbackQuery.id, '⚠️ 消息已过期，请重新发送');
@@ -121,6 +126,8 @@ export class MessageRouter {
     const userId = message.from?.id || message.chat.id;
     const messageId = message.message_id;
 
+    console.log('Regular message - chatId:', chatId, 'messageId:', messageId);
+
     const channels = this.channelConfig.getAllChannels();
     if (channels.length === 0) {
       await this.telegramClient.sendMessage(chatId, '⚠️ 没有可用的转发频道');
@@ -129,6 +136,7 @@ export class MessageRouter {
 
     // 缓存消息（键包含 chat.id，防止跨会话冲突）
     const cacheKey = `${chatId}:${messageId}`;
+    console.log('Cache key for message:', cacheKey);
     this.channelSelector.cacheMessage(cacheKey, message);
 
     // 发送带按钮的消息
