@@ -5,10 +5,7 @@ compatibility_date = "2024-01-01"
 [ai]
 binding = "AI"
 
-# KV namespace 用于跨实例缓存消息（解决 Worker 重启问题）
-# 如果需要配置 KV，请先创建 namespace 并取消注释以下配置：
-# 创建命令: wrangler kv namespace create "MESSAGE_CACHE" --preview
-# [[kv_namespaces]]
-# binding = "MESSAGE_CACHE"
-# id = "your-namespace-id"
-# preview_id = "your-preview-namespace-id"
+[[kv_namespaces]]
+binding = "MESSAGE_CACHE"
+id = "a2eec8ca45f44211b20ed98d662ab42b"
+preview_id = "a2eec8ca45f44211b20ed98d662ab42b"
