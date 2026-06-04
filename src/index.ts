@@ -108,6 +108,7 @@ app.post('/webhook', async (c) => {
       const message: TelegramMessage = body.message;
       await messageRouter.handleMessage(message);
     } else if (body.callback_query) {
+      console.log('Received callback_query:', JSON.stringify(body.callback_query));
       await messageRouter.handleCallbackQuery(body.callback_query);
     } else {
       console.log('No message or callback_query in update, skipping');
