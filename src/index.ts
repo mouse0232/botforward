@@ -161,4 +161,32 @@ app.get('/get-me', async (c) => {
   return c.json(result);
 });
 
+app.get('/set-commands', async (c) => {
+  const botToken = c.env.TELEGRAM_BOT_TOKEN;
+
+  if (!botToken) {
+    return c.text('Missing TELEGRAM_BOT_TOKEN', 400);
+  }
+
+  const url = `https://api.telegram.org/bot${botToken}/setMyCommands`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      commands: [
+        { command: 'start', description: '显示帮助信息' },
+        { command: 'help', description: '显示帮助信息' },
+        { command: 'forward', description: '转发消息到指定频道' },
+        { command: 'list', description: '查看所有可用频道' }
+      ]
+    })
+  });
+
+  const result = await response.json();
+
+  return c.json(result);
+});
+
 export default app;
